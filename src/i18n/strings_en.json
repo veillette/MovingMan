@@ -1,0 +1,37 @@
+{
+  "title": "Moving Man",
+  "screens": {
+    "intro": "Introduction",
+    "charts": "Charts"
+  },
+  "quantities": {
+    "position": "Position",
+    "velocity": "Velocity",
+    "acceleration": "Acceleration"
+  },
+  "units": {
+    "position": "m",
+    "velocity": "m/s",
+    "acceleration": "m/s²"
+  },
+  "vectors": {
+    "showVelocity": "Velocity Vector",
+    "showAcceleration": "Acceleration Vector"
+  },
+  "controls": {
+    "walls": "Walls"
+  },
+  "playback": {
+    "record": "Record",
+    "playback": "Playback",
+    "clear": "Clear",
+    "playbackSpeed": "Playback Speed"
+  },
+  "clock": {
+    "time": "Time",
+    "seconds": "s"
+  },
+  "chart": {
+    "time": "time (s)"
+  }
+}

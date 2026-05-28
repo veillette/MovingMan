@@ -1,0 +1,37 @@
+{
+  "title": "L'homme en mouvement",
+  "screens": {
+    "intro": "Introduction",
+    "charts": "Graphiques"
+  },
+  "quantities": {
+    "position": "Position",
+    "velocity": "Vitesse",
+    "acceleration": "Accélération"
+  },
+  "units": {
+    "position": "m",
+    "velocity": "m/s",
+    "acceleration": "m/s²"
+  },
+  "vectors": {
+    "showVelocity": "Vecteur vitesse",
+    "showAcceleration": "Vecteur accélération"
+  },
+  "controls": {
+    "walls": "Murs"
+  },
+  "playback": {
+    "record": "Enregistrer",
+    "playback": "Lecture",
+    "clear": "Effacer",
+    "playbackSpeed": "Vitesse de lecture"
+  },
+  "clock": {
+    "time": "Temps",
+    "seconds": "s"
+  },
+  "chart": {
+    "time": "temps (s)"
+  }
+}
