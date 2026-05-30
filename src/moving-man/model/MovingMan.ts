@@ -21,6 +21,7 @@ import { estimateDerivative } from "./motionMath.js";
 const {
   NUMBER_MOUSE_POINTS_TO_AVERAGE,
   DERIVATIVE_RADIUS,
+  FIXED_DT,
   SERIES_SIZE_LIMIT,
   SERIES_TIME_LIMIT,
   NUM_TIME_POINTS_TO_RECORD,
@@ -381,7 +382,7 @@ export class MovingMan {
   private getPointAtTime(series: DataSeries, lookupTime: number, reportedTime: number): DataPoint {
     for (let i = 0; i < series.size(); i++) {
       const point = series.getPoint(i);
-      if (point && point.time === lookupTime) {
+      if (point && Math.abs(point.time - lookupTime) < FIXED_DT * 0.5) {
         return { value: point.value, time: reportedTime };
       }
     }
@@ -393,11 +394,13 @@ export class MovingMan {
     const radius = DERIVATIVE_RADIUS;
     const points: DataPoint[] = [];
     for (let i = 0; i < series.size(); i++) {
-      const range = series.getPointsInRange(i - radius, i + radius);
-      points.push({
-        value: estimateDerivative(range),
-        time: (series.getPoint(i) as DataPoint).time,
-      });
+      const point = series.getPoint(i);
+      if (point) {
+        points.push({
+          value: estimateDerivative(series.getPointsInRange(i - radius, i + radius)),
+          time: point.time,
+        });
+      }
     }
     return points;
   }

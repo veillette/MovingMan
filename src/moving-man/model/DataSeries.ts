@@ -37,15 +37,16 @@ export class DataSeries {
     const points: DataPoint[] = [];
     const size = this.size();
     for (let i = start; i <= end; i++) {
-      if (i >= 0 && i < size) {
-        points.push(this.data[i] as DataPoint);
+      const point = this.getPoint(i);
+      if (point && i >= 0 && i < size) {
+        points.push(point);
       }
     }
     return points;
   }
 
   public getLastPoint(): DataPoint | null {
-    return this.data.length > 0 ? (this.data[this.data.length - 1] as DataPoint) : null;
+    return this.data[this.data.length - 1] ?? null;
   }
 
   /**
@@ -53,7 +54,7 @@ export class DataSeries {
    * is also 2. Matches PhET's behavior.
    */
   public getMidPoint(): DataPoint | null {
-    return this.data.length > 0 ? (this.data[Math.floor(this.data.length / 2)] as DataPoint) : null;
+    return this.data[Math.floor(this.data.length / 2)] ?? null;
   }
 
   public clear(): void {

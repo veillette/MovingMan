@@ -7,6 +7,7 @@
  */
 
 import { DerivedProperty, Property, type TReadOnlyProperty } from "scenerystack/axon";
+import { Dimension2 } from "scenerystack/dot";
 import { HBox, type Node, Text, VBox } from "scenerystack/scenery";
 import { PhetFont, PlayPauseButton, StepBackwardButton, StepForwardButton } from "scenerystack/scenery-phet";
 import { AquaRadioButtonGroup, HSlider, TextPushButton } from "scenerystack/sun";
@@ -84,7 +85,7 @@ export class PlaybackControls extends HBox {
 
     // ── Speed slider ─────────────────────────────────────────────────────────
     const speedSlider = new HSlider(model.playbackSpeedProperty, MovingManConstants.PLAYBACK_SPEED_RANGE, {
-      trackSize: { width: SPEED_SLIDER_WIDTH, height: 3 } as never,
+      trackSize: new Dimension2(SPEED_SLIDER_WIDTH, 3),
     });
     // Tick labels at slow / normal / fast — the slider's own helpers ensure they line up.
     speedSlider.addMajorTick(MovingManConstants.PLAYBACK_SPEED_RANGE.min, new Text("0.2×", { font: SMALL_FONT }));
