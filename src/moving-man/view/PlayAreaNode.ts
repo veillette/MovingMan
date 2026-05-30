@@ -12,10 +12,12 @@
 
 import type { TReadOnlyProperty } from "scenerystack/axon";
 import { Shape } from "scenerystack/kite";
-import { LinearGradient, Node, Rectangle, Text } from "scenerystack/scenery";
+import { Image, LinearGradient, Node, Rectangle, Text } from "scenerystack/scenery";
 import { PhetFont, RulerNode } from "scenerystack/scenery-phet";
 import { StringManager } from "../../i18n/StringManager.js";
 import MovingManColors from "../../MovingManColors.js";
+import cottageImage from "../images/cottage.gif";
+import treeImage from "../images/tree.png";
 import MovingManConstants from "../model/MovingManConstants.js";
 import type { MovingManModel } from "../model/MovingManModel.js";
 import { LinearTransform } from "./LinearTransform.js";
@@ -33,13 +35,21 @@ const WALL_HEIGHT_FRACTION = 0.42; // how far up the play area the walls rise
 // Ruler.
 const RULER_HEIGHT = 36;
 const RULER_INSET_BELOW_GROUND = 6;
-const RULER_MAJOR_TICK_HEIGHT = 18;
+// Must be strictly less than RULER_HEIGHT / 2, which RulerNode asserts.
+const RULER_MAJOR_TICK_HEIGHT = 16;
 const RULER_FONT = new PhetFont(11);
 const RULER_UNITS_FONT = new PhetFont(10);
 
 // Clock readout.
 const CLOCK_FONT = new PhetFont({ size: 14, weight: "bold" });
 const CLOCK_MARGIN = 8;
+
+// Background scenery (tree on the left, cottage on the right), as fractions of height,
+// standing on the ground line. Native art is tree 109×100, cottage 100×88.
+const TREE_HEIGHT_FRACTION = 0.36;
+const COTTAGE_HEIGHT_FRACTION = 0.3;
+const TREE_MODEL_X = -7.5;
+const COTTAGE_MODEL_X = 7;
 
 export type PlayAreaNodeOptions = {
   width: number;
@@ -123,6 +133,14 @@ export class PlayAreaNode extends Node {
       y: groundLineY + RULER_INSET_BELOW_GROUND,
     });
 
+    // Background scenery standing on the ground line, behind the man.
+    const tree = PlayAreaNode.createScenery(treeImage, height * TREE_HEIGHT_FRACTION, 109, 100);
+    tree.centerX = transform.modelToViewX(TREE_MODEL_X);
+    tree.bottom = groundLineY;
+    const cottage = PlayAreaNode.createScenery(cottageImage, height * COTTAGE_HEIGHT_FRACTION, 100, 88);
+    cottage.centerX = transform.modelToViewX(COTTAGE_MODEL_X);
+    cottage.bottom = groundLineY;
+
     // The man stands with his feet on the ground line.
     const manHeight = compact ? 70 : 110;
     const man = new MovingManNode(model, { transform, feetY: groundLineY, manHeight });
@@ -132,7 +150,19 @@ export class PlayAreaNode extends Node {
     clock.left = CLOCK_MARGIN;
     clock.top = CLOCK_MARGIN;
 
-    this.children = [sky, ground, leftWall, rightWall, ruler, man, clock];
+    this.children = [sky, ground, tree, cottage, leftWall, rightWall, ruler, man, clock];
+  }
+
+  /**
+   * A background image scaled to the given target height (px). The native pixel size is
+   * passed so bounds are known immediately (the image itself loads asynchronously).
+   */
+  private static createScenery(url: string, targetHeight: number, nativeWidth: number, nativeHeight: number): Node {
+    return new Image(url, {
+      scale: targetHeight / nativeHeight,
+      initialWidth: nativeWidth,
+      initialHeight: nativeHeight,
+    });
   }
 }
 

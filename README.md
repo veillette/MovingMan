@@ -13,7 +13,8 @@ SceneryStack, in the same architectural style as the LadyBug and RadioWaves port
 - **Charts** — Same play area, plus a stack of three time-series charts (one per
   quantity). Record motion, then scrub through it with a record/playback radio,
   rewind / play / step transport, playback-speed slider, and a click-to-seek
-  cursor inside each chart.
+  cursor inside each chart. Each chart sits in a collapsible box with its own
+  value-axis zoom; a shared control zooms the time axis of all three at once.
 
 ## Scripts
 
@@ -29,11 +30,14 @@ npm run icons       # rasterize public/icons/icon.svg into the PWA icons
 
 ## Notable deviations from the original
 
-- The **expression evaluator / "use function"** feature (typing a formula for the
-  position-vs-time function) is omitted; SceneryStack does not provide a built-in
-  text input. The three slider/spinner controls still drive position, velocity,
-  and acceleration.
-- **Collision sound effects** are omitted. The model still fires a `collideEmitter`,
-  so wiring up tambo is a small follow-up.
-- Cosmetic: the man is drawn with vector shapes instead of the original sprite,
-  and the easter-egg cloud animation is not included.
+- The original's free-form **"use function"** formula entry is replaced by an
+  **x(t) preset menu** (an `x(t):` combo box on both screens) offering linear,
+  parabolic, sinusoidal, and root functions; SceneryStack has no built-in text input.
+  Choosing one drives position from the function (velocity/acceleration are the usual
+  derivatives) and disables the position control; "Off" restores slider/drag control.
+- **Collision sound effects** play a thud plus a random grunt on each wall hit
+  (tambo `SoundClip`s driven by the model's `collideEmitter`); toggle them with the
+  navigation-bar sound button.
+- Cosmetic: the man is drawn with vector shapes (not the original sprite) but his
+  legs stride while walking and he leans on a wall hit; the original tree and cottage
+  art stand on the ground. The easter-egg cloud animation is not included.

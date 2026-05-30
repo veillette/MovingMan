@@ -13,6 +13,7 @@
 
 import { Emitter, NumberProperty, Property } from "scenerystack/axon";
 import { type DataPoint, type DataSeries, LimitedSizeDataSeries, LimitedTimeDataSeries } from "./DataSeries.js";
+import type { MovingManFunctionPreset } from "./functionPresets.js";
 import { MotionStrategy } from "./MotionStrategy.js";
 import MovingManConstants from "./MovingManConstants.js";
 import { estimateDerivative } from "./motionMath.js";
@@ -50,6 +51,10 @@ export class MovingMan {
   public readonly velocityProperty = new NumberProperty(0);
   public readonly accelerationProperty = new NumberProperty(0);
   public readonly motionStrategyProperty = new Property<MotionStrategy>(MotionStrategy.POSITION);
+
+  // When non-null, the man's position is driven by this preset function of time x(t),
+  // overriding the motion strategy. Interacting with the man (drag/slider) clears it.
+  public readonly functionProperty = new Property<MovingManFunctionPreset | null>(null);
 
   public readonly collideEmitter = new Emitter();
   public readonly historyClearedEmitter = new Emitter();
@@ -100,14 +105,17 @@ export class MovingMan {
   }
 
   public setPositionDriven(): void {
+    this.functionProperty.value = null;
     this.motionStrategyProperty.value = MotionStrategy.POSITION;
   }
 
   public setVelocityDriven(): void {
+    this.functionProperty.value = null;
     this.motionStrategyProperty.value = MotionStrategy.VELOCITY;
   }
 
   public setAccelerationDriven(): void {
+    this.functionProperty.value = null;
     this.motionStrategyProperty.value = MotionStrategy.ACCELERATION;
   }
 
@@ -172,12 +180,47 @@ export class MovingMan {
       this.times.shift();
     }
 
-    if (this.positionDriven) {
+    const preset = this.functionProperty.value;
+    if (preset) {
+      this.updateFromFunction(time, preset);
+    } else if (this.positionDriven) {
       this.updateFromPosition(time);
     } else if (this.velocityDriven) {
       this.updateFromVelocity(time, delta);
     } else if (this.accelerationDriven) {
       this.updateFromAcceleration(time, delta);
+    }
+  }
+
+  /**
+   * Drive position directly from a preset x(t), then differentiate to v and a using the
+   * same centered-derivative pipeline as pointer-driven motion (minus the smoothing).
+   */
+  private updateFromFunction(time: number, preset: MovingManFunctionPreset): void {
+    const previousPosition = this.positionProperty.value;
+
+    const position = this.clampIfWalled(preset.evaluate(time)).position;
+    this.positionModelSeries.add(position, time);
+
+    // Differentiate position → velocity → acceleration.
+    this.velocityModelSeries.setData(this.estimatedCenteredDerivatives(this.positionModelSeries));
+    this.accelerationModelSeries.setData(this.estimatedCenteredDerivatives(this.velocityModelSeries));
+
+    const time1StepsAgo = this.getTimeNTimeStepsAgo(1);
+    const time2StepsAgo = this.getTimeNTimeStepsAgo(2);
+
+    this.positionGraphSeries.add(position, time);
+    this.velocityGraphSeries.addPoint(this.getPointAtTime(this.velocityModelSeries, time1StepsAgo, time));
+    this.accelerationGraphSeries.addPoint(this.getPointAtTime(this.accelerationModelSeries, time2StepsAgo, time));
+
+    this.positionProperty.value = position;
+    this.velocityProperty.value = this.snapToZero(this.velocityGraphSeries.getLastPoint()?.value ?? 0);
+    this.accelerationProperty.value = this.snapToZero(this.accelerationGraphSeries.getLastPoint()?.value ?? 0);
+
+    this.setMousePosition(position);
+
+    if (!this.hitsWall(previousPosition) && this.hitsWall(this.positionProperty.value)) {
+      this.collideEmitter.emit();
     }
   }
 

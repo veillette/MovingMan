@@ -2,23 +2,29 @@
  * ChartsScreenView.ts
  *
  * The "Charts" screen. A compact play area at the top, three quantity-vs-time charts
- * stacked below (each with its own slider control on the left), a record/playback
+ * stacked below (each in a collapsible box with its own slider control and value-axis
+ * zoom on the left), a shared time-axis zoom near the top-right, a record/playback
  * transport at the bottom, and Reset All in the bottom-right corner.
  *
  * On every frame we ask the bamboo chart nodes to refresh from the latest series
  * values; the cursor inside each chart follows the model time automatically.
  */
 
-import type { Range } from "scenerystack/dot";
-import { HBox, type Node, type TColor, VBox } from "scenerystack/scenery";
-import { ResetAllButton } from "scenerystack/scenery-phet";
+import { NumberProperty, type Property, type TReadOnlyProperty } from "scenerystack/axon";
+import { Range } from "scenerystack/dot";
+import { HBox, Node, type TColor, Text, VBox } from "scenerystack/scenery";
+import { PhetFont, PlusMinusZoomButtonGroup, ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
+import { AccordionBox } from "scenerystack/sun";
 import type { Tandem } from "scenerystack/tandem";
+import { StringManager } from "../../i18n/StringManager.js";
 import MovingManColors from "../../MovingManColors.js";
 import type { DataSeries } from "../model/DataSeries.js";
 import MovingManConstants from "../model/MovingManConstants.js";
 import type { MovingManModel } from "../model/MovingManModel.js";
-import { ChartNode } from "./ChartNode.js";
+import { ChartNode, type ZoomLevel } from "./ChartNode.js";
+import { FunctionComboBox } from "./FunctionComboBox.js";
+import { addCollisionSounds } from "./MovingManSounds.js";
 import { PlayAreaNode } from "./PlayAreaNode.js";
 import { PlaybackControls } from "./PlaybackControls.js";
 import { VariableControl, type VariableControlKind } from "./VariableControl.js";
@@ -31,10 +37,33 @@ const PLAY_AREA_HEIGHT = 150;
 
 const VARIABLE_CONTROL_SLIDER_WIDTH = 100;
 const CHART_WIDTH = 660;
-const CHART_HEIGHT = 100;
+// Charts are a little shorter than the original 100 px so three collapsible rows plus
+// their title bars still clear the playback transport at the bottom of the screen.
+const CHART_HEIGHT = 80;
 const ROW_SPACING = 4;
+const ACCORDION_MIN_WIDTH = 880;
+const EXPAND_BUTTON_SIDE_LENGTH = 18;
+
+const ACCORDION_TITLE_FONT = new PhetFont({ size: 14, weight: "bold" });
+const ZOOM_LABEL_FONT = new PhetFont(12);
 
 export type ChartsScreenViewOptions = ScreenViewOptions & { tandem: Tandem };
+
+type RowSpec = {
+  kind: VariableControlKind;
+  controlRange: Range;
+  valueLevels: readonly ZoomLevel[];
+  color: TColor;
+  series: DataSeries;
+  titleStringProperty: TReadOnlyProperty<string>;
+  timeZoomLevelProperty: NumberProperty;
+};
+
+type Row = {
+  node: Node;
+  valueZoomLevelProperty: NumberProperty;
+  expandedProperty: Property<boolean>;
+};
 
 export class ChartsScreenView extends ScreenView {
   private readonly chartNodes: ChartNode[] = [];
@@ -43,47 +72,89 @@ export class ChartsScreenView extends ScreenView {
     super(providedOptions);
 
     const layoutBounds = this.layoutBounds;
+    const quantities = StringManager.getInstance().getQuantityStrings();
+    const chartStrings = StringManager.getInstance().getChartStrings();
+
+    addCollisionSounds(model.movingMan.collideEmitter);
 
     const playArea = new PlayAreaNode(model, { width: PLAY_AREA_WIDTH, height: PLAY_AREA_HEIGHT, compact: true });
     const wallsCheckbox = new WallsCheckbox(model);
 
+    // Shared time (x) axis zoom level, applied to all three charts at once.
+    const timeZoomLevelProperty = new NumberProperty(0, {
+      range: new Range(0, MovingManConstants.TIME_ZOOM_LEVELS.length - 1),
+    });
+
     const positionRow = this.makeRow(model, {
       kind: "position",
       controlRange: MovingManConstants.POSITION_RANGE,
-      chartRange: MovingManConstants.POSITION_CHART_RANGE,
-      yStep: 5,
+      valueLevels: MovingManConstants.POSITION_ZOOM_LEVELS,
       color: MovingManColors.positionProperty,
       series: model.movingMan.positionGraphSeries,
+      titleStringProperty: quantities.positionStringProperty,
+      timeZoomLevelProperty,
     });
     const velocityRow = this.makeRow(model, {
       kind: "velocity",
       controlRange: MovingManConstants.VELOCITY_RANGE,
-      chartRange: MovingManConstants.VELOCITY_CHART_RANGE,
-      yStep: 6,
+      valueLevels: MovingManConstants.VELOCITY_ZOOM_LEVELS,
       color: MovingManColors.velocityProperty,
       series: model.movingMan.velocityGraphSeries,
+      titleStringProperty: quantities.velocityStringProperty,
+      timeZoomLevelProperty,
     });
     const accelerationRow = this.makeRow(model, {
       kind: "acceleration",
       controlRange: MovingManConstants.ACCELERATION_RANGE,
-      chartRange: MovingManConstants.ACCELERATION_CHART_RANGE,
-      yStep: 30,
+      valueLevels: MovingManConstants.ACCELERATION_ZOOM_LEVELS,
       color: MovingManColors.accelerationProperty,
       series: model.movingMan.accelerationGraphSeries,
+      titleStringProperty: quantities.accelerationStringProperty,
+      timeZoomLevelProperty,
     });
+    const rows = [positionRow, velocityRow, accelerationRow];
 
     const chartsColumn = new VBox({
       spacing: ROW_SPACING,
       align: "left",
-      children: [positionRow, velocityRow, accelerationRow],
+      children: rows.map((row) => row.node),
+    });
+
+    // Shared time-axis zoom control, near the top-right (below the walls checkbox).
+    const timeZoomGroup = new PlusMinusZoomButtonGroup(timeZoomLevelProperty, {
+      orientation: "horizontal",
+      spacing: 4,
+    });
+    const timeZoomBox = new HBox({
+      spacing: 6,
+      children: [
+        new Text(chartStrings.timeStringProperty, {
+          font: ZOOM_LABEL_FONT,
+          fill: MovingManColors.foregroundColorProperty,
+        }),
+        timeZoomGroup,
+      ],
     });
 
     const playbackControls = new PlaybackControls(model);
+
+    // Preset position function chooser, bottom-left; its list opens upward.
+    const comboListParent = new Node();
+    const functionComboBox = new FunctionComboBox(model, comboListParent, "above");
+
+    const resetView = (): void => {
+      timeZoomLevelProperty.reset();
+      for (const row of rows) {
+        row.valueZoomLevelProperty.reset();
+        row.expandedProperty.value = true;
+      }
+    };
 
     const resetAllButton = new ResetAllButton({
       listener: () => {
         this.interruptSubtreeInput();
         model.reset();
+        resetView();
       },
       tandem: providedOptions.tandem.createTandem("resetAllButton"),
     });
@@ -95,45 +166,81 @@ export class ChartsScreenView extends ScreenView {
     wallsCheckbox.right = layoutBounds.maxX - MARGIN;
     wallsCheckbox.top = layoutBounds.minY + MARGIN;
 
+    timeZoomBox.right = layoutBounds.maxX - MARGIN;
+    timeZoomBox.top = wallsCheckbox.bottom + 12;
+
     chartsColumn.left = layoutBounds.minX + MARGIN;
     chartsColumn.top = playArea.bottom + MARGIN;
 
     playbackControls.centerX = layoutBounds.centerX - 60;
     playbackControls.bottom = layoutBounds.maxY - MARGIN;
 
+    functionComboBox.left = layoutBounds.minX + MARGIN;
+    functionComboBox.bottom = layoutBounds.maxY - MARGIN;
+
     resetAllButton.right = layoutBounds.maxX - MARGIN;
     resetAllButton.bottom = layoutBounds.maxY - MARGIN;
 
-    this.children = [playArea, wallsCheckbox, chartsColumn, playbackControls, resetAllButton];
+    this.children = [
+      playArea,
+      wallsCheckbox,
+      timeZoomBox,
+      chartsColumn,
+      functionComboBox,
+      playbackControls,
+      resetAllButton,
+      comboListParent,
+    ];
   }
 
-  private makeRow(
-    model: MovingManModel,
-    spec: {
-      kind: VariableControlKind;
-      controlRange: Range;
-      chartRange: Range;
-      yStep: number;
-      color: TColor;
-      series: DataSeries;
-    },
-  ): Node {
+  private makeRow(model: MovingManModel, spec: RowSpec): Row {
     const control = new VariableControl(model, {
       kind: spec.kind,
       range: spec.controlRange,
       sliderWidth: VARIABLE_CONTROL_SLIDER_WIDTH,
       decimalPlaces: spec.kind === "acceleration" ? 1 : 2,
     });
+
+    // Per-chart value (y) axis zoom.
+    const valueZoomLevelProperty = new NumberProperty(0, {
+      range: new Range(0, spec.valueLevels.length - 1),
+    });
+    const valueZoomGroup = new PlusMinusZoomButtonGroup(valueZoomLevelProperty, {
+      orientation: "vertical",
+      spacing: 4,
+    });
+
     const chart = new ChartNode(model, model.timeProperty, {
       series: spec.series,
       color: spec.color,
-      yRange: spec.chartRange,
-      yStep: spec.yStep,
+      valueZoomLevelProperty,
+      valueLevels: spec.valueLevels,
+      timeZoomLevelProperty: spec.timeZoomLevelProperty,
+      timeLevels: MovingManConstants.TIME_ZOOM_LEVELS,
       width: CHART_WIDTH,
       height: CHART_HEIGHT,
     });
     this.chartNodes.push(chart);
-    return new HBox({ spacing: 12, align: "center", children: [control, chart] });
+
+    const rowContent = new HBox({ spacing: 8, align: "center", children: [control, valueZoomGroup, chart] });
+
+    const accordionBox = new AccordionBox(rowContent, {
+      titleNode: new Text(spec.titleStringProperty, { font: ACCORDION_TITLE_FONT, fill: spec.color }),
+      titleAlignX: "left",
+      expandedDefaultValue: true,
+      fill: MovingManColors.panelFillProperty,
+      stroke: MovingManColors.panelStrokeProperty,
+      cornerRadius: 6,
+      contentXMargin: 8,
+      contentYMargin: 4,
+      expandCollapseButtonOptions: { sideLength: EXPAND_BUTTON_SIDE_LENGTH },
+      minWidth: ACCORDION_MIN_WIDTH,
+      // Collapse to just the title bar so the VBox reclaims the freed vertical space,
+      // matching the original sim's collapsible rows.
+      useExpandedBoundsWhenCollapsed: false,
+    });
+
+    return { node: accordionBox, valueZoomLevelProperty, expandedProperty: accordionBox.expandedProperty };
   }
 
   public override step(dt: number): void {

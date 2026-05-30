@@ -43,6 +43,10 @@ onReadyToLaunch(() => {
       localizationOptions: {
         supportsDynamicLocale: true,
       },
+      audioOptions: {
+        // Enables the navigation-bar sound toggle; collision sounds play through tambo.
+        supportsSound: true,
+      },
     }),
   };
 

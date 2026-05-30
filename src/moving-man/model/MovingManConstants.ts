@@ -49,6 +49,31 @@ const MovingManConstants = {
   POSITION_CHART_RANGE: new Range(-10, 10),
   VELOCITY_CHART_RANGE: new Range(-12, 12),
   ACCELERATION_CHART_RANGE: new Range(-60, 60),
+
+  // ── Chart zoom levels ────────────────────────────────────────────────────────
+  // Each level is { max, step }: the axis extent and the tick/grid spacing at that
+  // zoom. Index 0 is fully zoomed out and matches the default ranges above.
+  // The shared time (x) axis runs 0..max; the value (y) axes run -max..+max.
+  TIME_ZOOM_LEVELS: [
+    { max: 20, step: 5 },
+    { max: 10, step: 2 },
+    { max: 4, step: 1 },
+  ],
+  POSITION_ZOOM_LEVELS: [
+    { max: 10, step: 5 },
+    { max: 6, step: 3 },
+    { max: 2, step: 1 },
+  ],
+  VELOCITY_ZOOM_LEVELS: [
+    { max: 12, step: 6 },
+    { max: 6, step: 3 },
+    { max: 2, step: 1 },
+  ],
+  ACCELERATION_ZOOM_LEVELS: [
+    { max: 60, step: 30 },
+    { max: 30, step: 15 },
+    { max: 10, step: 5 },
+  ],
 } as const;
 
 export default MovingManConstants;

@@ -9,12 +9,14 @@
  * original sim's simplification of the Intro tab (see Deviations.md in the source).
  */
 
-import { HBox } from "scenerystack/scenery";
+import { HBox, Node } from "scenerystack/scenery";
 import { PlayPauseButton, ResetAllButton } from "scenerystack/scenery-phet";
 import { ScreenView, type ScreenViewOptions } from "scenerystack/sim";
 import type { Tandem } from "scenerystack/tandem";
 import MovingManConstants from "../model/MovingManConstants.js";
 import type { MovingManModel } from "../model/MovingManModel.js";
+import { FunctionComboBox } from "./FunctionComboBox.js";
+import { addCollisionSounds } from "./MovingManSounds.js";
 import { PlayAreaNode } from "./PlayAreaNode.js";
 import { VariableControl } from "./VariableControl.js";
 import { WallsCheckbox } from "./WallsCheckbox.js";
@@ -32,6 +34,8 @@ export class IntroScreenView extends ScreenView {
     super(providedOptions);
 
     const layoutBounds = this.layoutBounds;
+
+    addCollisionSounds(model.movingMan.collideEmitter);
 
     const playArea = new PlayAreaNode(model, { width: PLAY_AREA_WIDTH, height: PLAY_AREA_HEIGHT });
 
@@ -59,6 +63,10 @@ export class IntroScreenView extends ScreenView {
 
     const wallsCheckbox = new WallsCheckbox(model);
 
+    // The combo box's dropdown list renders into this parent so it sits above siblings.
+    const comboListParent = new Node();
+    const functionComboBox = new FunctionComboBox(model, comboListParent, "below");
+
     const playPauseButton = new PlayPauseButton(model.isPlayingProperty, { radius: PLAY_PAUSE_RADIUS });
 
     const resetAllButton = new ResetAllButton({
@@ -79,12 +87,23 @@ export class IntroScreenView extends ScreenView {
     controlsRow.centerX = layoutBounds.centerX;
     controlsRow.top = playArea.bottom + MARGIN;
 
+    functionComboBox.left = controlsRow.left;
+    functionComboBox.top = controlsRow.bottom + 2 * MARGIN;
+
     resetAllButton.right = layoutBounds.maxX - MARGIN;
     resetAllButton.bottom = layoutBounds.maxY - MARGIN;
 
     playPauseButton.right = resetAllButton.left - 2 * MARGIN;
     playPauseButton.centerY = resetAllButton.centerY;
 
-    this.children = [playArea, wallsCheckbox, controlsRow, playPauseButton, resetAllButton];
+    this.children = [
+      playArea,
+      wallsCheckbox,
+      controlsRow,
+      functionComboBox,
+      playPauseButton,
+      resetAllButton,
+      comboListParent,
+    ];
   }
 }

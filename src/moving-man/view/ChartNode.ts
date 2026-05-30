@@ -5,9 +5,13 @@
  * screen. Draws background, grid lines, tick marks/labels, a zero axis, the data line,
  * and a vertical playback cursor that tracks the current simulation time. While in
  * playback mode the user can click or drag inside the chart to scrub.
+ *
+ * Both axes are zoomable. A per-chart value (y) zoom level and a shared time (x) zoom
+ * level are passed in as integer NumberProperties; changing either rescales the
+ * transform and the tick/grid spacing for that axis.
  */
 
-import type { TReadOnlyProperty } from "scenerystack/axon";
+import type { NumberProperty, TReadOnlyProperty } from "scenerystack/axon";
 import {
   AxisLine,
   ChartRectangle,
@@ -17,14 +21,13 @@ import {
   TickLabelSet,
   TickMarkSet,
 } from "scenerystack/bamboo";
-import { type Range, Vector2 } from "scenerystack/dot";
+import { Range, Vector2 } from "scenerystack/dot";
 import { Shape } from "scenerystack/kite";
 import { Orientation } from "scenerystack/phet-core";
 import { DragListener, Line, Node, type TColor, Text } from "scenerystack/scenery";
 import { PhetFont } from "scenerystack/scenery-phet";
 import MovingManColors from "../../MovingManColors.js";
 import type { DataSeries } from "../model/DataSeries.js";
-import MovingManConstants from "../model/MovingManConstants.js";
 import type { MovingManModel } from "../model/MovingManModel.js";
 
 // Pixel insets reserved for tick labels around the plot rectangle.
@@ -41,11 +44,18 @@ const CURSOR_LINE_WIDTH = 1.5;
 
 const GRID_LINE_WIDTH = 0.5;
 
+/** One zoom level: axis extent `max` and tick/grid `step`, both in model units. */
+export type ZoomLevel = { readonly max: number; readonly step: number };
+
 export type ChartNodeOptions = {
   series: DataSeries;
   color: TColor;
-  yRange: Range;
-  yStep: number;
+  /** Per-chart value (y) zoom: integer level into `valueLevels`, range [0, n-1]. */
+  valueZoomLevelProperty: NumberProperty;
+  valueLevels: readonly ZoomLevel[];
+  /** Shared time (x) zoom: integer level into `timeLevels`, range [0, n-1]. */
+  timeZoomLevelProperty: NumberProperty;
+  timeLevels: readonly ZoomLevel[];
   /** Total width and height in px of the ChartNode (including tick-label insets). */
   width: number;
   height: number;
@@ -57,20 +67,27 @@ export class ChartNode extends Node {
   private readonly linePlot: LinePlot;
   private readonly cursorLine: Line;
   private readonly dataset: Vector2[] = [];
+  private readonly timeProperty: TReadOnlyProperty<number>;
 
   public constructor(model: MovingManModel, timeProperty: TReadOnlyProperty<number>, options: ChartNodeOptions) {
     super();
     this.series = options.series;
+    this.timeProperty = timeProperty;
+
+    const valueLevel = options.valueLevels[options.valueZoomLevelProperty.value] ?? options.valueLevels[0];
+    const timeLevel = options.timeLevels[options.timeZoomLevelProperty.value] ?? options.timeLevels[0];
+    if (!(valueLevel && timeLevel)) {
+      throw new Error("ChartNode requires at least one zoom level per axis");
+    }
 
     const plotWidth = options.width - LEFT_INSET - RIGHT_INSET;
     const plotHeight = options.height - TOP_INSET - BOTTOM_INSET;
-    const xRange = { min: 0, max: MovingManConstants.MAX_TIME };
 
     const chartTransform = new ChartTransform({
       viewWidth: plotWidth,
       viewHeight: plotHeight,
-      modelXRange: { min: xRange.min, max: xRange.max } as Range,
-      modelYRange: options.yRange,
+      modelXRange: new Range(0, timeLevel.max),
+      modelYRange: new Range(-valueLevel.max, valueLevel.max),
       // Bamboo's default has +y in model = -y in view. We want larger values up.
       modelYRangeInverted: false,
     });
@@ -83,26 +100,26 @@ export class ChartNode extends Node {
       lineWidth: 1,
     });
 
-    // Grid lines.
-    const horizontalGridLines = new GridLineSet(chartTransform, Orientation.VERTICAL, options.yStep, {
+    // Grid lines. Horizontal lines are spaced by the value step; vertical by the time step.
+    const horizontalGridLines = new GridLineSet(chartTransform, Orientation.VERTICAL, valueLevel.step, {
       stroke: MovingManColors.chartGridProperty,
       lineWidth: GRID_LINE_WIDTH,
     });
-    const verticalGridLines = new GridLineSet(chartTransform, Orientation.HORIZONTAL, 2, {
+    const verticalGridLines = new GridLineSet(chartTransform, Orientation.HORIZONTAL, timeLevel.step, {
       stroke: MovingManColors.chartGridProperty,
       lineWidth: GRID_LINE_WIDTH,
     });
 
     // Tick marks and labels.
-    const yTickMarks = new TickMarkSet(chartTransform, Orientation.VERTICAL, options.yStep, { edge: "min" });
-    const yTickLabels = new TickLabelSet(chartTransform, Orientation.VERTICAL, options.yStep, {
+    const yTickMarks = new TickMarkSet(chartTransform, Orientation.VERTICAL, valueLevel.step, { edge: "min" });
+    const yTickLabels = new TickLabelSet(chartTransform, Orientation.VERTICAL, valueLevel.step, {
       edge: "min",
       createLabel: (value: number) => new Text(ChartNode.formatTickValue(value), { font: TICK_LABEL_FONT }),
     });
-    const xTickMarks = new TickMarkSet(chartTransform, Orientation.HORIZONTAL, 2, { edge: "min" });
-    const xTickLabels = new TickLabelSet(chartTransform, Orientation.HORIZONTAL, 2, {
+    const xTickMarks = new TickMarkSet(chartTransform, Orientation.HORIZONTAL, timeLevel.step, { edge: "min" });
+    const xTickLabels = new TickLabelSet(chartTransform, Orientation.HORIZONTAL, timeLevel.step, {
       edge: "min",
-      createLabel: (value: number) => new Text(value.toString(), { font: TICK_LABEL_FONT }),
+      createLabel: (value: number) => new Text(ChartNode.formatTickValue(value), { font: TICK_LABEL_FONT }),
     });
 
     // The zero-axis line, drawn as a slightly darker line at y = 0.
@@ -123,10 +140,7 @@ export class ChartNode extends Node {
       lineWidth: CURSOR_LINE_WIDTH,
       cursor: "ew-resize",
     });
-    timeProperty.link((time) => {
-      this.cursorLine.x1 = chartTransform.modelToViewX(time);
-      this.cursorLine.x2 = this.cursorLine.x1;
-    });
+    timeProperty.link(() => this.updateCursor());
 
     // The plot area is offset inside the ChartNode by the tick insets.
     const plotContainer = new Node({
@@ -152,6 +166,32 @@ export class ChartNode extends Node {
 
     this.children = [plotContainer];
 
+    // ── Zoom ──────────────────────────────────────────────────────────────────
+    // Value (y) zoom: rescale the y range and the spacing of the y grid/ticks.
+    options.valueZoomLevelProperty.link((level) => {
+      const l = options.valueLevels[level];
+      if (!l) {
+        return;
+      }
+      chartTransform.setModelYRange(new Range(-l.max, l.max));
+      horizontalGridLines.setSpacing(l.step);
+      yTickMarks.setSpacing(l.step);
+      yTickLabels.setSpacing(l.step);
+    });
+    // Time (x) zoom: rescale the x range and the spacing of the x grid/ticks, then
+    // reposition the cursor (which is derived from the transform).
+    options.timeZoomLevelProperty.link((level) => {
+      const l = options.timeLevels[level];
+      if (!l) {
+        return;
+      }
+      chartTransform.setModelXRange(new Range(0, l.max));
+      verticalGridLines.setSpacing(l.step);
+      xTickMarks.setSpacing(l.step);
+      xTickLabels.setSpacing(l.step);
+      this.updateCursor();
+    });
+
     // ── Scrubbing inside the chart ────────────────────────────────────────────
     // Click or drag inside the chart background to seek (only while in playback).
     const scrub = (globalX: number): void => {
@@ -174,6 +214,13 @@ export class ChartNode extends Node {
 
     // Make sure the (initially-empty) line plot is positioned correctly.
     this.refresh();
+  }
+
+  /** Position the playback cursor at the current time under the current x transform. */
+  private updateCursor(): void {
+    const x = this.chartTransform.modelToViewX(this.timeProperty.value);
+    this.cursorLine.x1 = x;
+    this.cursorLine.x2 = x;
   }
 
   /**

@@ -52,6 +52,19 @@ export class MovingManModel implements TModel, ManContext {
       this.recordingProperty.value = false;
     }
     this.movingMan = new MovingMan(this, this.noRecording);
+
+    // Choosing a preset function restarts the run from t = 0 so the whole trajectory
+    // plays out. On the Charts screen we record it live; on Intro it just runs.
+    this.movingMan.functionProperty.lazyLink((preset) => {
+      if (preset) {
+        this.pause();
+        if (!this.noRecording) {
+          this.recordingProperty.value = true;
+        }
+        this.resetTimeAndHistory();
+        this.play();
+      }
+    });
   }
 
   // ── ManContext ────────────────────────────────────────────────────────────────
@@ -235,6 +248,7 @@ export class MovingManModel implements TModel, ManContext {
     this.showVelocityVectorProperty.reset();
     this.showAccelerationVectorProperty.reset();
 
+    this.movingMan.functionProperty.reset();
     this.movingMan.positionProperty.reset();
     this.movingMan.velocityProperty.reset();
     this.movingMan.accelerationProperty.reset();

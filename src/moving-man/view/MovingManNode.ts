@@ -8,6 +8,7 @@
 
 import { Circle, DragListener, Line, Node, Rectangle } from "scenerystack/scenery";
 import { ArrowNode } from "scenerystack/scenery-phet";
+import { Animation, Easing } from "scenerystack/twixt";
 import MovingManColors from "../../MovingManColors.js";
 import MovingManConstants from "../model/MovingManConstants.js";
 import type { MovingManModel } from "../model/MovingManModel.js";
@@ -17,6 +18,18 @@ const { VELOCITY_SCALE, ACCELERATION_SCALE } = MovingManConstants;
 
 // Velocity above which the figure flips to face the direction of travel.
 const FACING_THRESHOLD = 0.1;
+
+// ── Walking animation ─────────────────────────────────────────────────────────
+// Foot swing (as a fraction of figure height) at full stride, the speed (m/s) at which
+// the stride reaches full amplitude, and the leg cadence (rad/s of the swing phase).
+const MAX_FOOT_SWING_FRACTION = 0.07;
+const WALK_REF_SPEED = 4;
+const WALK_CADENCE = 11;
+
+// ── Crash wobble ──────────────────────────────────────────────────────────────
+// Lean angle (rad) on a wall hit, eased back to upright over this many seconds.
+const CRASH_LEAN = 0.22;
+const CRASH_DURATION = 0.45;
 
 // Vertical gap (px) between the head and the first (velocity) arrow, and between arrows.
 const ARROW_GAP_ABOVE_HEAD = 16;
@@ -44,7 +57,7 @@ export class MovingManNode extends Node {
 
     // The drawn figure (in local coords: feet at origin, body rising along -y).
     // Kept in its own child so it can be mirrored without flipping the arrows.
-    const figure = MovingManNode.createFigure(h);
+    const { figure, leftLeg, rightLeg, leftFootX, rightFootX } = MovingManNode.createFigure(h);
 
     const headTopY = -0.99 * h;
     const velocityArrow = new ArrowNode(0, 0, 0, 0, {
@@ -94,6 +107,40 @@ export class MovingManNode extends Node {
       accelerationArrow.visible = visible;
     });
 
+    // ── Walking: swing the legs while moving, scaled by speed ────────────────────
+    const maxSwing = MAX_FOOT_SWING_FRACTION * h;
+    let walkPhase = 0;
+    let lastTime = model.timeProperty.value;
+    model.timeProperty.link((time) => {
+      const dt = time - lastTime;
+      lastTime = time;
+      // Ignore rewinds / scrubs / resets (only advance the stride for forward play).
+      if (dt > 0 && dt < 0.5) {
+        const speedFraction = Math.min(Math.abs(man.velocityProperty.value) / WALK_REF_SPEED, 1);
+        walkPhase += dt * WALK_CADENCE;
+        const stride = speedFraction * maxSwing * Math.sin(walkPhase);
+        leftLeg.x2 = leftFootX + stride;
+        rightLeg.x2 = rightFootX - stride;
+      }
+    });
+
+    // ── Crash: lean on a wall hit, then ease back upright ────────────────────────
+    let crashAnimation: Animation | null = null;
+    man.collideEmitter.addListener(() => {
+      crashAnimation?.stop();
+      figure.rotation = man.positionProperty.value >= 0 ? CRASH_LEAN : -CRASH_LEAN;
+      crashAnimation = new Animation({
+        setValue: (r: number) => {
+          figure.rotation = r;
+        },
+        getValue: () => figure.rotation,
+        to: 0,
+        duration: CRASH_DURATION,
+        easing: Easing.QUADRATIC_OUT,
+      });
+      crashAnimation.start();
+    });
+
     // Dragging the man drives him from position (and, on the Charts screen, records).
     this.addInputListener(
       new DragListener({
@@ -125,7 +172,13 @@ export class MovingManNode extends Node {
     }
   }
 
-  private static createFigure(h: number): Node {
+  private static createFigure(h: number): {
+    figure: Node;
+    leftLeg: Line;
+    rightLeg: Line;
+    leftFootX: number;
+    rightFootX: number;
+  } {
     const figure = new Node();
 
     const skin = MovingManColors.manSkinProperty;
@@ -139,10 +192,14 @@ export class MovingManNode extends Node {
     const limbWidth = 0.06 * h;
     const torsoWidth = 0.2 * h;
 
-    // Legs (drawn slightly apart, mid-stride).
+    // Legs (drawn slightly apart, mid-stride). The feet (x2) swing while walking.
     const legOptions = { stroke: outline, lineWidth: limbWidth, lineCap: "round" as const };
-    figure.addChild(new Line(-0.02 * h, hipY, -0.09 * h, 0, legOptions));
-    figure.addChild(new Line(0.02 * h, hipY, 0.09 * h, 0, legOptions));
+    const leftFootX = -0.09 * h;
+    const rightFootX = 0.09 * h;
+    const leftLeg = new Line(-0.02 * h, hipY, leftFootX, 0, legOptions);
+    const rightLeg = new Line(0.02 * h, hipY, rightFootX, 0, legOptions);
+    figure.addChild(leftLeg);
+    figure.addChild(rightLeg);
 
     // Torso (the shirt).
     figure.addChild(
@@ -162,6 +219,6 @@ export class MovingManNode extends Node {
     // Head.
     figure.addChild(new Circle(headRadius, { y: headCenterY, fill: skin, stroke: outline, lineWidth: 1 }));
 
-    return figure;
+    return { figure, leftLeg, rightLeg, leftFootX, rightFootX };
   }
 }

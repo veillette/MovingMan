@@ -104,6 +104,14 @@ export class VariableControl extends Panel {
       titleNodeOptions: { font: TITLE_FONT_NORMAL },
     });
 
+    // While a preset function drives position, the position control is read-only
+    // (matching the original sim, which disabled the position slider in function mode).
+    if (kind === "position") {
+      model.movingMan.functionProperty.link((preset) => {
+        numberControl.enabledProperty.value = preset === null;
+      });
+    }
+
     const children: Node[] = [numberControl];
     if (bundle.vectorVisibleProperty && bundle.vectorLabelStringProperty) {
       children.push(VariableControl.makeVectorCheckbox(bundle.vectorVisibleProperty, bundle.vectorLabelStringProperty));
