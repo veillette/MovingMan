@@ -19,7 +19,7 @@ import MovingManColors from "../../MovingManColors.js";
 import MovingManConstants from "../model/MovingManConstants.js";
 import type { MovingManModel } from "../model/MovingManModel.js";
 import { LinearTransform } from "./LinearTransform.js";
-import { MovingManNode } from "./MovingManNode.js";
+import { MovingManSpriteNode } from "./MovingManSpriteNode.js";
 
 const { HALF_CONTAINER_WIDTH } = MovingManConstants;
 
@@ -125,7 +125,7 @@ export class PlayAreaNode extends Node {
 
     // The man stands with his feet on the ground line.
     const manHeight = compact ? 70 : 110;
-    const man = new MovingManNode(model, { transform, feetY: groundLineY, manHeight });
+    const man = new MovingManSpriteNode(model, { transform, feetY: groundLineY, manHeight });
 
     // Clock readout, top-left of the play area.
     const clock = new ClockReadout(model.timeProperty, compact);
