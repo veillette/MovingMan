@@ -41,8 +41,9 @@ const MovingManColors = {
   manSkinProperty: profileColor("manSkin", "#f2c9a0", "#f2c9a0"),
   manStrokeProperty: profileColor("manStroke", BLACK, BLACK),
 
-  // Walls at the ends of the track.
+  // Brick walls at the ends of the track (brick + mortar between courses).
   wallFillProperty: profileColor("wallFill", "#b5532c", "#b5532c"),
+  wallMortarProperty: profileColor("wallMortar", "#e3c7a6", "#e3c7a6"),
   wallStrokeProperty: profileColor("wallStroke", new Color(90, 40, 20), new Color(90, 40, 20)),
 
   // Charts.

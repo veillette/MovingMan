@@ -32,16 +32,16 @@ import { WallsCheckbox } from "./WallsCheckbox.js";
 
 const MARGIN = 10;
 
-const PLAY_AREA_WIDTH = 900;
+const PLAY_AREA_WIDTH = 890;
 const PLAY_AREA_HEIGHT = 150;
 
 const VARIABLE_CONTROL_SLIDER_WIDTH = 100;
-const CHART_WIDTH = 660;
+const CHART_WIDTH = 700;
 // Charts are a little shorter than the original 100 px so three collapsible rows plus
 // their title bars still clear the playback transport at the bottom of the screen.
-const CHART_HEIGHT = 80;
-const ROW_SPACING = 4;
-const ACCORDION_MIN_WIDTH = 880;
+const CHART_HEIGHT = 86;
+const ROW_SPACING = 6;
+const ACCORDION_MIN_WIDTH = 890;
 const EXPAND_BUTTON_SIDE_LENGTH = 18;
 
 const ACCORDION_TITLE_FONT = new PhetFont({ size: 14, weight: "bold" });

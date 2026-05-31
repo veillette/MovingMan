@@ -21,11 +21,11 @@ import { PlayAreaNode } from "./PlayAreaNode.js";
 import { VariableControl } from "./VariableControl.js";
 import { WallsCheckbox } from "./WallsCheckbox.js";
 
-const MARGIN = 12;
-const PLAY_AREA_WIDTH = 900;
-const PLAY_AREA_HEIGHT = 320;
-const CONTROL_SLIDER_WIDTH = 220;
-const PLAY_PAUSE_RADIUS = 22;
+const MARGIN = 14;
+const PLAY_AREA_WIDTH = 980;
+const PLAY_AREA_HEIGHT = 384;
+const CONTROL_SLIDER_WIDTH = 240;
+const PLAY_PAUSE_RADIUS = 28;
 
 export type IntroScreenViewOptions = ScreenViewOptions & { tandem: Tandem };
 
@@ -56,16 +56,17 @@ export class IntroScreenView extends ScreenView {
     });
 
     const controlsRow = new HBox({
-      spacing: 12,
+      spacing: 18,
       align: "top",
       children: [positionControl, velocityControl, accelerationControl],
     });
 
     const wallsCheckbox = new WallsCheckbox(model);
 
-    // The combo box's dropdown list renders into this parent so it sits above siblings.
+    // The combo box's dropdown list renders into this parent so it sits above siblings;
+    // it opens upward because the chooser now sits at the bottom of the screen.
     const comboListParent = new Node();
-    const functionComboBox = new FunctionComboBox(model, comboListParent, "below");
+    const functionComboBox = new FunctionComboBox(model, comboListParent, "above");
 
     const playPauseButton = new PlayPauseButton(model.isPlayingProperty, { radius: PLAY_PAUSE_RADIUS });
 
@@ -81,19 +82,21 @@ export class IntroScreenView extends ScreenView {
     playArea.centerX = layoutBounds.centerX;
     playArea.top = layoutBounds.minY + MARGIN;
 
-    wallsCheckbox.right = layoutBounds.maxX - MARGIN;
-    wallsCheckbox.top = playArea.top;
+    // Walls toggle tucked into the top-right corner of the sky, like the original sim.
+    wallsCheckbox.right = playArea.right - 10;
+    wallsCheckbox.top = playArea.top + 10;
 
     controlsRow.centerX = layoutBounds.centerX;
-    controlsRow.top = playArea.bottom + MARGIN;
+    controlsRow.top = playArea.bottom + 20;
 
-    functionComboBox.left = controlsRow.left;
-    functionComboBox.top = controlsRow.bottom + 2 * MARGIN;
+    // Preset position-function chooser, bottom-left.
+    functionComboBox.left = layoutBounds.minX + MARGIN;
+    functionComboBox.bottom = layoutBounds.maxY - MARGIN;
 
     resetAllButton.right = layoutBounds.maxX - MARGIN;
     resetAllButton.bottom = layoutBounds.maxY - MARGIN;
 
-    playPauseButton.right = resetAllButton.left - 2 * MARGIN;
+    playPauseButton.right = resetAllButton.left - 3 * MARGIN;
     playPauseButton.centerY = resetAllButton.centerY;
 
     this.children = [
